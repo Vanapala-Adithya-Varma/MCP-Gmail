@@ -1,8 +1,8 @@
-# Gmail MCP Server
+# Gmail MCP Server + Local LLM Client
 
-A Python-based Model Context Protocol (MCP) server that connects Claude Desktop to Gmail using the official Gmail API.
+A Python-based Model Context Protocol (MCP) server that connects Gmail to Claude Desktop and local Ollama-powered LLMs using the official Gmail API.
 
-This project allows Claude Desktop to interact with a Gmail account through natural-language instructions.
+This project allows Claude Desktop or a local Ollama LLM to interact with a Gmail account through natural-language instructions.
 
 ## Features
 
@@ -15,10 +15,17 @@ This project allows Claude Desktop to interact with a Gmail account through natu
 - Gmail search query support
 - Google OAuth 2.0 authentication
 - Claude Desktop integration
+- Local Ollama LLM support
+- Automatic discovery of locally installed Ollama models
+- Interactive local model selection
+- Ability to switch Ollama models during a session
+- MCP client for connecting local LLMs to Gmail tools
 
 ---
 
 ## Architecture
+
+### Claude Desktop
 
 ```text
 ┌──────────────────────┐
@@ -28,24 +35,22 @@ This project allows Claude Desktop to interact with a Gmail account through natu
            │ MCP / STDIO
            ▼
 ┌──────────────────────┐
-│     mcp_gmail.py     │
+│    mcp_gmail.py      │
 │                      │
-│       FastMCP        │
+│      FastMCP         │
 └──────────┬───────────┘
            │
            ▼
 ┌──────────────────────┐
 │      GmailTool       │
 │                      │
-│  Search              │
-│  Read                │
-│  Send                │
-│  Delete              │
+│ Search / Read        │
+│ Send / Delete        │
 └──────────┬───────────┘
            │
            ▼
 ┌──────────────────────┐
-│       Gmail API      │
+│      Gmail API       │
 └──────────┬───────────┘
            │
            ▼
@@ -55,6 +60,55 @@ This project allows Claude Desktop to interact with a Gmail account through natu
 └──────────────────────┘
 ```
 
+### Local Ollama LLM
+
+```text
+┌────────────────────────────┐
+│       Ollama Models        │
+│                            │
+│ Qwen / Llama / Ministral   │
+│ DeepSeek / Other Models    │
+└─────────────┬──────────────┘
+              │
+              │ Ollama API
+              ▼
+┌────────────────────────────┐
+│         client.py          │
+│                            │
+│ Model selection            │
+│ MCP client                 │
+└─────────────┬──────────────┘
+              │
+              │ MCP / STDIO
+              ▼
+┌────────────────────────────┐
+│       mcp_gmail.py         │
+│                            │
+│         FastMCP            │
+└─────────────┬──────────────┘
+              │
+              ▼
+┌────────────────────────────┐
+│         GmailTool          │
+│                            │
+│ Search / Read / Send       │
+│ Delete                     │
+└─────────────┬──────────────┘
+              │
+              ▼
+┌────────────────────────────┐
+│         Gmail API          │
+└─────────────┬──────────────┘
+              │
+              ▼
+┌────────────────────────────┐
+│      Authorized Gmail      │
+│          Account           │
+└────────────────────────────┘
+```
+
+The local LLM path keeps model inference on the user's machine. `client.py` acts as the MCP client and connects the selected Ollama model to the Gmail MCP server.
+
 ---
 
 ## Project Structure
@@ -63,6 +117,7 @@ This project allows Claude Desktop to interact with a Gmail account through natu
 Gmail-MCP/
 │
 ├── mcp_gmail.py
+├── client.py
 ├── client-secret.json
 │
 ├── token files/
@@ -89,8 +144,27 @@ Gmail-MCP/
 - Windows
 - Python 3.12
 - Claude Desktop
+- Ollama
+- Local LLM MCP client
 - Google Cloud account
 - Gmail account
+
+For the local LLM client, you also need:
+
+- Ollama
+- At least one locally installed Ollama model
+
+Check installed models:
+
+```powershell
+ollama list
+```
+
+Install the Ollama Python package:
+
+```powershell
+pip install ollama
+```
 
 Python 3.12 is recommended for this project.
 
@@ -128,7 +202,7 @@ This project currently uses MCP 1.x and the `FastMCP` API.
 Install the required packages:
 
 ```powershell
-pip install "mcp==1.30.0" google-api-python-client google-auth-httplib2 google-auth-oauthlib pydantic
+pip install "mcp==1.30.0" google-api-python-client google-auth-httplib2 google-auth-oauthlib pydantic ollama
 ```
 
 Verify MCP:
@@ -276,6 +350,113 @@ The server entry point is:
 if __name__ == "__main__":
     mcp.run()
 ```
+
+---
+
+# Local Ollama LLM Client
+
+The project includes `client.py`, which allows a locally running Ollama model to use the Gmail MCP tools.
+
+The architecture is:
+
+```text
+Local Ollama Model
+        │
+        ▼
+    client.py
+        │
+        │ MCP / STDIO
+        ▼
+   mcp_gmail.py
+        │
+        ▼
+     Gmail API
+```
+
+## 1. Install Ollama
+
+Install Ollama and make sure it is running.
+
+Check installed models:
+
+```powershell
+ollama list
+```
+
+For example:
+
+```text
+qwen3-coder:30b
+```
+
+## 2. Install the Ollama Python package
+
+```powershell
+pip install ollama
+```
+
+## 3. Run the Local LLM Client
+
+From the project directory:
+
+```powershell
+cd D:\Gmail-MCP-Local
+python client.py
+```
+
+The client starts the Gmail MCP server automatically and retrieves the available Gmail MCP tools.
+
+## 4. Select a Local Model
+
+`client.py` can discover locally installed Ollama models and lets the user select one.
+
+Example:
+
+```text
+========================================
+       LOCAL OLLAMA MODELS
+========================================
+
+1. qwen3:8b
+2. ministral-3:8b
+3. qwen3-coder:30b
+
+========================================
+
+Select a model [1-3]:
+```
+
+## 5. Change Models During a Session
+
+Type:
+
+```text
+model
+```
+
+at the `You:` prompt to display the available models again and switch to another local Ollama model without restarting the application.
+
+## 6. Example Requests
+
+```text
+Search my Gmail inbox for the 5 most recent emails.
+```
+
+```text
+Find the latest email and tell me its subject and sender.
+```
+
+```text
+Read the body of the latest email.
+```
+
+The local model decides which Gmail MCP tool is required, `client.py` executes the MCP tool, and the tool result is returned to the local model for the final response.
+
+### Important
+
+The current local client uses Ollama models. It does not automatically detect models managed by other local runtimes such as LM Studio or standalone llama.cpp installations.
+
+The Gmail MCP server remains independent of the LLM runtime and can continue to be used with Claude Desktop.
 
 ---
 
@@ -465,9 +646,57 @@ Delete email MESSAGE_ID.
 
 ---
 
+# Testing the Local LLM Client
+
+After confirming the Gmail MCP server works, test the local Ollama client.
+
+## Test 1: Search Gmail
+
+Run:
+
+```powershell
+python client.py
+```
+
+Then ask:
+
+```text
+Search my Gmail inbox for the 5 most recent emails.
+```
+
+The client should show an MCP tool call similar to:
+
+```text
+[MCP TOOL CALL] Gmail-Search-Emails
+```
+
+## Test 2: Read an Email
+
+Ask:
+
+```text
+Find the latest email and read its body.
+```
+
+The local model should use the Gmail search/details/body tools as required.
+
+## Test 3: Exit
+
+Type:
+
+```text
+exit
+```
+
+to close the local client.
+
+> Start with read-only operations. Test sending or deleting emails only after verifying that the local LLM and MCP tool-calling flow works correctly.
+
+---
+
 # Testing the Gmail MCP
 
-After connecting the MCP server to Claude Desktop, test the read operations first.
+After connecting the MCP server to Claude Desktop or running the local Ollama client, test the read operations first.
 
 ## Test 1: Search
 
@@ -744,7 +973,7 @@ cd Gmail-MCP
 Install dependencies:
 
 ```powershell
-pip install "mcp==1.30.0" google-api-python-client google-auth-httplib2 google-auth-oauthlib pydantic
+pip install "mcp==1.30.0" google-api-python-client google-auth-httplib2 google-auth-oauthlib pydantic ollama
 ```
 
 Add your Google OAuth credentials:
@@ -766,6 +995,7 @@ python mcp_gmail.py
 Possible future improvements include:
 
 - Reply to emails
+- Support for additional local LLM runtimes such as LM Studio and llama.cpp
 - Forward emails
 - Create drafts
 - Mark emails as read/unread
@@ -823,3 +1053,4 @@ Built with:
 - Gmail API
 - Google OAuth 2.0
 - Claude Desktop
+- Ollama Local Models
